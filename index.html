@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>股票交易模擬</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.1/papaparse.min.js"></script>
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+  
+<body>
+  <div id="left">
+    <div id="chart-container">
+   <div id="chart-overlay">
+  <div id="stock-name" style="font-size: 18px; font-weight: bold; color: white;">股票名稱 股票代碼</div>
+
+  <div id="today-price" style="font-size: 32px; font-weight: bold; margin-top: 5px;">000.00</div>
+
+  <div id="price-change" style="font-size: 16px; margin-top: 5px;">+0.00 +0.00%</div>
+
+  <div id="current-date" style="font-size: 14px; margin-top: 10px; color: white;">0000-00-00</div>
+</div>
+      <div id="chart"></div>
+    </div>
+    <div class="controls">
+<div class="controls" style="width: 100%; max-width: 400px; margin: 0 auto;">
+  <!-- ✨ 最上排：睡覺 + 數量控制 -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%;">
+    <button class="hold-btn" style="padding: 8px 50x; display: inline-block;" onclick="nextDay()">睡</button>
+
+    <div class="quantity-control" style="display: inline-flex; align-items: center;">
+      <button class="quantity-btn" onclick="changeQuantity(-1)">-</button>
+      <div class="quantity-value" id="quantity" style="min-width: 30px; text-align: center;">0</div>
+      <button class="quantity-btn" onclick="changeQuantity(1)">+</button>
+      
+    </div>
+  </div>
+
+  <!-- ✨ 中間排：現 沖 資 券 四個按鈕 -->
+  <div class="action-buttons" style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+    <div class="action-btn" id="btn-cash" onclick="selectAction('cash')">現</div>
+    <div class="action-btn" id="btn-daytrade" onclick="selectAction('daytrade')">沖</div>
+    <div class="action-btn" id="btn-margin" onclick="selectAction('margin')">資</div>
+    <div class="action-btn" id="btn-short" onclick="selectAction('short')">券</div>
+  </div>
+
+  <!-- ✨ 最下排：整張買進 / 整張賣出 -->
+  <div class="trade-buttons" style="display: flex; gap: 10px; justify-content: center;">
+    <button class="buy-btn" onclick="executeTrade('buy')">整張買進</button>
+    <button class="sell-btn" onclick="executeTrade('sell')">整張賣出</button>
+  </div>
+</div>
+
+
+      </div>
+  </div>
+
+  <div id="right">
+    <div class="controls-top">
+      <input type="file" id="csvFile" accept=".csv,.html">
+
+
+      <button onclick="restartGame()">重新開始</button>
+        <button onclick="downloadStock()">下載股價</button> <!-- ✨ 新加的按鈕 -->
+    </div>
+
+<h2 style="margin-bottom: 10px; font-size: 20px;">資產狀況</h2>
+<table style="border-collapse: collapse; width: 100%; font-size: 14px;">
+  <tr>
+    <th style="padding: 4px; text-align: left; border: 1px solid #444;">類別</th>
+    <th style="padding: 4px; text-align: left; border: 1px solid #444;">張數</th>
+    <th style="padding: 4px; text-align: left; border: 1px solid #444;">均價</th>
+    <th style="padding: 4px; text-align: left; border: 1px solid #444;">市價</th>
+    <th style="padding: 4px; text-align: left; border: 1px solid #444;">成本</th>
+    <th style="padding: 4px; text-align: left; border: 1px solid #444;">損益</th>
+  </tr>
+  <tr>
+    <td style="padding: 4px; border: 1px solid #444;">現股</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="position"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="long-cost"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="market-price"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="long-total"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="long-pnl"></td>
+  </tr>
+  <tr>
+    <td style="padding: 4px; border: 1px solid #444;">融資</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="margin-position"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="margin-cost"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="market-price2"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="margin-total"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="margin-pnl"></td>
+  </tr>
+  <tr>
+    <td style="padding: 4px; border: 1px solid #444;">融券</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="short"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="short-cost"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="market-price3"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="short-total"></td>
+    <td style="padding: 4px; border: 1px solid #444;" id="short-pnl"></td>
+  </tr>
+  <tr class="summary-row">
+    <td style="padding: 4px; border: 1px solid #444;" colspan="5">資金</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="cash"></td>
+  </tr>
+  <tr class="summary-row">
+    <td style="padding: 4px; border: 1px solid #444;" colspan="5">總成本</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="total-cost"></td>
+  </tr>
+  <tr class="summary-row">
+    <td style="padding: 4px; border: 1px solid #444;" colspan="5">總預估現值</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="total-value"></td>
+  </tr>
+  <tr class="summary-row">
+    <td style="padding: 4px; border: 1px solid #444;" colspan="5">總融資金額</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="total-margin"></td>
+  </tr>
+  <tr class="summary-row">
+    <td style="padding: 4px; border: 1px solid #444;" colspan="5">總利息</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="total-interest" class="negative"></td>
+  </tr>
+  <tr class="summary-row">
+    <td style="padding: 4px; border: 1px solid #444;" colspan="5">總手續費</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="total-fee" class="negative"></td>
+  </tr>
+  <tr class="summary-row">
+    <td style="padding: 4px; border: 1px solid #444;" colspan="5">總報酬率</td>
+    <td style="padding: 4px; border: 1px solid #444;" id="total-return"></td>
+  </tr>
+  
+</table>
+
+
+    <!-- ✨ 新增交易紀錄區塊 ✨ -->
+    <div id="trade-history" style="height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-top: 10px;">
+      <h3>交易紀錄</h3>
+      <ul id="trade-list" style="list-style-type: none; padding: 0; margin: 0;"></ul>
+    </div>
+    <!-- ✨ 新增結束 ✨ -->
+
+  </div>
+
+  <div id="initialCapitalDialog" style="display: none;">
+    <h3>從銀行轉入多少資金?</h3>
+    <input type="number" id="initialCapital" value="1000000" min="10000" step="10000">
+    <div>
+      <button onclick="setInitialCapital(1000000)">100萬</button>
+      <button onclick="setInitialCapital(500000)">50萬</button>
+      <button onclick="confirmInitialCapital()">確認</button>
+    </div>
+  </div>
+
+  <script src="src/main.js"></script>
+</body>
+</html>
