@@ -1129,4 +1129,3 @@ function updateProgressBar(percent) {
     bar.style.width = `${percent}%`;
   }
 }
- 
