@@ -820,13 +820,7 @@ async function downloadStock() {
       return;
     }
 
-    // 🔥 根據 stockCode 從 stockNameMap 找到公司名稱
     stockName = stockNameMap[stockCode] || "未知公司";
-
-    // （這裡可以加一個提醒）
-    if (stockName === "未知公司") {
-      alert("⚠️ 找不到這個股票代碼對應的公司名稱，請確認！");
-    }
 
     const today = new Date();
     const requests = [];
@@ -842,23 +836,30 @@ async function downloadStock() {
     try {
       const results = await Promise.all(requests);
 
+      // 🔥 🔥 🔥 新增這段檢查
+      const hasData = results.some(result => result.stat === "OK" && result.data && result.data.length > 0);
+      if (!hasData) {
+        throw new Error("找不到任何股價資料");
+      }
+
       let combinedData = [];
       results.forEach(monthData => {
         if (monthData.stat === "OK") {
           monthData.data.forEach(row => {
             const date = row[0];
-            const open = row[3];
-            const high = row[4];
-            const low = row[5];
-            const close = row[6];
-
-            combinedData.push({
-              Date: formatDate(date),
-              Open: parseFloat(open.replace(',', '')),
-              High: parseFloat(high.replace(',', '')),
-              Low: parseFloat(low.replace(',', '')),
-              Close: parseFloat(close.replace(',', ''))
-            });
+            const open = parseFloat(row[3].replace(',', ''));
+            const high = parseFloat(row[4].replace(',', ''));
+            const low = parseFloat(row[5].replace(',', ''));
+            const close = parseFloat(row[6].replace(',', ''));
+            if (!isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
+              combinedData.push({
+                Date: formatDate(date),
+                Open: open,
+                High: high,
+                Low: low,
+                Close: close
+              });
+            }
           });
         }
       });
@@ -872,9 +873,9 @@ async function downloadStock() {
 
       alert(`股票 ${stockName} ${stockCode} 資料載入成功！可以開始模擬交易囉！`);
     } catch (error) {
-      alert("自動下載失敗，請手動操作。");
+      alert("⚠️ 找不到股價資料，請改用手動下載模式！");
       const proceed = confirm(
-        "請先移到最下面，點選【查1年】，再按右上角【匯出HTML】。\n\n匯出後即可回來開啟檔案。\n\n確定前往股價頁面嗎？"
+        "請先移到最下面，點選【查1年】，再按右上角【匯出HTML】。\n\n匯出後即可回來開啟檔案。\n\n要前往股價網站嗎？"
       );
       if (proceed) {
         const fallbackUrl = `https://goodinfo.tw/tw/ShowK_Chart.asp?STOCK_ID=${stockCode}&CHT_CAT=DATE`;
@@ -883,6 +884,7 @@ async function downloadStock() {
     }
   }
 }
+
 
 
 function formatDate(twDateStr) {
