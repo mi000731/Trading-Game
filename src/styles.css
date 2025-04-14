@@ -1,0 +1,285 @@
+/* General Layout */
+body { 
+  font-family: Arial, sans-serif; 
+  margin: 0;
+  padding: 0;
+  display: flex; 
+  flex-direction: row;
+  min-height: 100vh;
+  background-color: #f5f5f5; 
+  overflow: hidden;
+}
+
+/* Left Panel - Chart and Controls */
+#left {
+  background-color: white;
+  color: black; 
+  flex: 3; 
+  padding: 20px; 
+  border-radius: 8px; 
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+#chart-container {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+  display: flex;            /* ✨ 加這個讓內容可以置中 */
+  justify-content: center;  /* ✨ 水平置中 */
+  align-items: center;      /* ✨ 垂直置中 (可選) */
+  background-color: #f9f9f9; /* ✨ 淡灰底會更好看 */
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+#chart { 
+  width: 90%;               /* ✨ K線圖不要太大，自然置中 */
+  max-width: 600px;         /* ✨ 最多600px，避免放大超醜 */
+  height: 100%;
+}
+
+#chart-overlay {
+  color: white; /* ✨ 字體改成白色 */
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: rgba(0, 0, 0, 0.8); /* ✨ 背景改成黑色半透明 */
+  padding: 10px;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+/* Right Panel - Portfolio Status */
+#right { 
+  flex: 2; 
+  background-color: #222; 
+  color: white; 
+  padding: 20px; 
+  border-radius: 8px; 
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3); 
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Controls Layout */
+.controls-top {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+/* Table Styles */
+table { 
+  border-collapse: collapse; 
+  width: 100%; 
+  margin-top: 20px;
+}
+
+td, th { 
+  border: 1px solid #444; 
+  padding: 8px; 
+  text-align: left; 
+}
+
+/* Price Display */
+.positive { 
+  color: #ff4d4d; 
+  font-weight: bold; 
+}
+
+.negative { 
+  color: #4dff4d; 
+  font-weight: bold; 
+}
+
+.today-price { 
+  font-size: 24px; 
+  font-weight: bold; 
+}
+
+.price-change { 
+  font-size: 16px; 
+  margin-left: 10px; 
+}
+
+.summary-row { 
+  font-weight: bold; 
+  background-color: #333; 
+}
+
+/* Trading Controls */
+.controls { 
+
+  padding: 15px; 
+  background-color: #f9f9f9; 
+  border-radius: 5px; 
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.action-btn {
+  color: black;
+  padding: 10px 15px;
+  background-color: white;
+  border: 2px solid black;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: bold;
+  flex: 1;
+  text-align: center;
+}
+
+.action-btn.active {
+  color: #FFA500;
+  border-color: #FFA500;
+}
+
+/* Quantity Control */
+.quantity-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: black;
+  border-radius: 4px;
+  padding: 5px 10px;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.quantity-btn {
+  width: 60px;
+  height: 60px;
+  background-color: #333;
+  color: white;
+  border: none;
+  font-size: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quantity-value {
+  width: 50px;
+  text-align: center;
+  font-size: 32px;
+  font-weight: bold;
+  color: white;
+}
+
+/* Trade Buttons */
+.trade-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.buy-btn {
+  padding: 10px 15px;
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: bold;
+  flex: 1;
+  text-align: center;
+}
+
+.sell-btn {
+  padding: 10px 15px;
+  background-color: #4dff4d;
+  color: black;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: bold;
+  flex: 1;
+  text-align: center;
+}
+
+.hold-btn {
+  padding: 20px 30px;
+  background-color: white;
+  color: black;
+  border: 2px solid black;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 32px;
+  position: absolute;
+  top: 650px;
+  left: 10px;
+}
+
+/* Initial Capital Dialog */
+#initialCapitalDialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  z-index: 1000;
+  text-align: center;
+}
+
+#initialCapitalDialog input {
+  padding: 10px;
+  margin: 10px 0;
+  width: 200px;
+}
+
+#initialCapitalDialog button {
+  padding: 10px 20px;
+  margin: 0 5px;
+  cursor: pointer;
+}
+
+/* Animation */
+.refresh-animation {
+  animation: refresh 0.5s;
+}
+
+@keyframes refresh {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Trade History Box */
+#trade-history {
+  margin-top: 20px;
+  background-color: #333;
+  border-radius: 5px;
+  padding: 10px;
+  height: 300px;
+  overflow-y: auto;
+}
+
+#trade-history h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+#trade-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+#trade-list li {
+  margin-bottom: 5px;
+  font-size: 14px;
+  color: white;
+}
