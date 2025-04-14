@@ -3,7 +3,7 @@ let marginInterestAccrued = 0; // ✨ 新增：累積融資利息
 let shortSellDate = null; // ✨ 新增：記錄融券賣出日
 let taxFee = 0; // ✏️ 新增：累積證券交易稅
 let stockData = [];
-let currentIndex = 20;
+let currentIndex = getRandomStartIndex();
 let virtualStartDate = new Date();
 let cash = 1000000;
 let initialCapital = 1000000;
@@ -17,6 +17,7 @@ let chart, candleSeries;
 let stockName = "範例公司";  // 🔥 全域變數
 let stockCode = "";          // 🔥 全域變數
 let stockNameMap = {};       // 🔥 股票代碼 ➔ 股票名稱 對應表
+let animationMonitorTimeout = null;
 
 const lotSize = 1000;
 const financingRate = 6.45 / 100 / 365;
@@ -26,6 +27,54 @@ const daytradeBuyFeeRate = 0.1425 / 100;
 const daytradeSellFeeRate = (0.1425 + 0.15) / 100;
 const transactionFeeRate = 1.425 / 1000;
 const taxRate = 0.003; // ✏️ 0.3% 的交易稅
+
+function triggerDownload() {
+  const overlay = document.getElementById('overlay-button');
+  overlay.style.display = 'none';  // 點一次就隱藏
+  downloadStock();                 // 直接呼叫你原本下載股價的功能
+}
+
+// 🔥 啟動時檢查是否需要顯示透明按鈕
+function showOverlayIfNeeded() {
+  if (stockData.length === 0) {
+    const overlay = document.getElementById('overlay-button');
+    overlay.style.display = 'block';
+  }
+}
+function getRandomStartIndex() {
+  if (stockData.length <= 20) {
+    return 0; // 資料太少只能從最前面
+  }
+
+  let index;
+  let tryCount = 0;
+
+  do {
+    index = Math.floor(Math.random() * stockData.length);
+
+    const startDate = new Date(stockData[index]?.Date);
+    const endDate = new Date(stockData[index + 19]?.Date);
+
+    const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24); // 天數差
+
+    tryCount++;
+
+    if (tryCount > 1) { 
+      // 🔥 如果找超過50次都找不到，就放棄，從第0筆開始
+      console.warn("⚠️ 資料異常太多，自動從第一天開始");
+      return 19;
+    }
+
+  } while (
+    index > stockData.length - 20 || // 要保證後面夠20筆
+    isNaN(new Date(stockData[index]?.Date)) ||  // 保護防止亂日期
+    isNaN(new Date(stockData[index + 19]?.Date)) ||
+    ((new Date(stockData[index + 19]?.Date)) - (new Date(stockData[index]?.Date))) / (1000 * 60 * 60 * 24) > 35  // 🔥 超過35天
+  );
+
+  return index;
+}
+
 
 function addTradeRecord(date, action, amount, price, cashChange = null) {
   const list = document.getElementById('trade-list');
@@ -129,10 +178,19 @@ function drawChart() {
           close: targetClose
         };
         candleSeries.setData(animatedData);
+        console.log(`畫K線 #${animationIndex}`, {
+  open: open,
+  high: high,
+  low: low,
+  close: currentClose
+});
+        
         clearInterval(moveInterval);
       } else {
         // 每次微調
-        currentClose += (targetClose > open ? 0.5 : -0.5);
+// 🔥 最後一天慢慢停下來的收盤價微調
+let diff = targetClose - currentClose;
+currentClose += diff * 0.2; // 每次只前進剩下距離的20%
 
         // ✨ 注意：高低價也要一起動態更新！（這樣K線不會扭曲）
         const dynamicHigh = Math.max(open, currentClose, high);
@@ -146,6 +204,12 @@ function drawChart() {
           close: currentClose
         };
         candleSeries.setData(animatedData);
+        console.log(`畫K線 #${animationIndex}`, {
+  open: open,
+  high: high,
+  low: low,
+  close: currentClose
+});
       }
 
       chart.timeScale().scrollToRealTime(); // ✨ 一直保持最新
@@ -453,7 +517,7 @@ function updateUI() {
 
   const currentDateElement = document.getElementById('current-date');
   if (currentDateElement) {
-    currentDateElement.textContent = `${fakeDate}`;
+    currentDateElement.textContent = `模擬時間::${fakeDate}`;
   }
 
 
@@ -718,23 +782,86 @@ function updateChartData() {
 
 // === 重置遊戲 ===
 function restartGame() {
-  currentIndex = 20;
+  if (stockData.length > 0) {
+    showSummaryDialog(); // ✅ 新增：跳出總結
+  }
+
+  currentIndex = getRandomStartIndex();
   cash = initialCapital;
   position = marginPosition = shortPosition = 0;
   longCost = marginCost = shortCost = 0;
   longFee = marginFee = shortFee = 0;
   quantity = 0;
   document.getElementById('quantity').textContent = '0';
-  document.getElementById('trade-list').innerHTML = ''; // ✏️ 清空交易紀錄
+  document.getElementById('trade-list').innerHTML = '';
+
   if (stockData.length > 0) {
     document.getElementById('chart').innerHTML = '';
     chartInitialized = false;
   }
+
   resetDisplay();
   updateUI();
   drawChart();
   showInitialCapitalDialog();
 }
+function showSummaryDialog() {
+  const firstShownIndex = Math.max(0, currentIndex - 20);
+  const lastShownIndex = Math.max(0, currentIndex - 1);
+
+  const startDate = stockData[firstShownIndex]?.Date || "未知";
+  const endDate = stockData[lastShownIndex]?.Date || "未知";
+
+  const price = +stockData[lastShownIndex]?.Close || 0;
+
+  // 🔥 用最新收盤價算持股、融資、融券估值
+  const longValue = price * position * lotSize;
+  const marginValue = price * marginPosition * lotSize;
+  const shortPnl = (shortCost - price) * shortPosition * lotSize;
+  const shortValue = shortCost * shortPosition * lotSize * 0.9;
+
+  const totalValue = longValue 
+                   + (marginValue - marginCost * marginPosition * lotSize * 0.6)
+                   + cash 
+                   + shortPnl 
+                   + shortValue; // ✅ 這是總估值（不是只有現金）
+
+  const totalReturn = ((totalValue - initialCapital) / initialCapital) * 100;
+
+  const cashColor = totalValue >= initialCapital ? 'red' : 'green';
+  const returnColor = totalReturn >= 0 ? 'red' : 'green';
+
+  const message = `
+    <div style="text-align: left; font-size: 18px;">
+      <b>真實時間</b>：${startDate} ~ ${endDate}<br><br>
+      <b>總估值</b>：<span style="color:${cashColor}; font-weight:bold;">${Math.round(totalValue).toLocaleString()} 元</span><br><br>
+      <b>總報酬率</b>：<span style="color:${returnColor}; font-weight:bold;">${totalReturn.toFixed(2)}%</span>
+    </div>
+  `;
+
+  const dialog = document.createElement('div');
+  dialog.innerHTML = message;
+  dialog.style.position = 'fixed';
+  dialog.style.top = '50%';
+  dialog.style.left = '50%';
+  dialog.style.transform = 'translate(-50%, -50%)';
+  dialog.style.background = '#fff';
+  dialog.style.padding = '30px';
+  dialog.style.borderRadius = '10px';
+  dialog.style.boxShadow = '0 0 20px rgba(0,0,0,0.5)';
+  dialog.style.zIndex = 9999;
+  
+  const button = document.createElement('button');
+  button.textContent = '確定';
+  button.style.marginTop = '20px';
+  button.style.padding = '10px 20px';
+  button.style.cursor = 'pointer';
+  button.onclick = () => dialog.remove();
+  
+  dialog.appendChild(button);
+  document.body.appendChild(dialog);
+}
+
 function resetDisplay() {
   document.getElementById('current-date').textContent = '';
   document.getElementById('today-price').textContent = '';
@@ -745,9 +872,9 @@ function resetDisplay() {
 
 // === 初始化 ===
 document.addEventListener('DOMContentLoaded', () => {
-
+   
   loadStockNameMap();  // 🔥 一進網頁就讀取 name.csv
-  
+  showOverlayIfNeeded();  // 🔥 啟動時判斷要不要開啟透明按鈕
   document.getElementById('csvFile').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -759,20 +886,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (file.name.endsWith('.csv')) {
       // 如果是CSV
       Papa.parse(text, {
-        header: true,
-        complete: function(results) {
-          stockData = results.data.filter(row => row.Date && row.Close);
-          stockData.forEach(row => {
-            // 保留原本CSV的時間格式（yyyy-mm-dd）
-            row.Date = row.Date.split(' ')[0]; 
-          });
-          stockData.sort((a, b) => new Date(a.Date) - new Date(b.Date));
-          currentIndex = 20;
-          drawChart();
-          showInitialCapitalDialog();
-          selectAction('hold');
-        }
-      });
+  header: true,
+  complete: function(results) {
+    stockData = results.data.filter(row => row.Date && row.Close);
+    stockData.forEach((row, index) => {
+      row.Date = row.Date.split(' ')[0]; 
+    fixInvalidData(row, index); // 🔥 這裡加
+    });
+    stockData.sort((a, b) => new Date(a.Date) - new Date(b.Date));
+    currentIndex = 20;
+    drawChart();
+    showInitialCapitalDialog();
+    selectAction('hold');
+  }
+});
+
     } else if (file.name.endsWith('.html')) {
       // 如果是HTML
       const parser = new DOMParser();
@@ -797,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       stockData.reverse(); // Goodinfo是新到舊，反轉成舊到新
-      currentIndex = 20;
+      currentIndex = getRandomStartIndex();
       drawChart();
       showInitialCapitalDialog();
       selectAction('hold');
@@ -820,58 +948,66 @@ async function downloadStock() {
       return;
     }
 
-    stockName = stockNameMap[stockCode] || "未知公司";
-
     const today = new Date();
     const requests = [];
+
+    // 🔥 清空進度條
+    updateProgressBar(0);
 
     for (let i = 0; i < 12; i++) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const yyyymmdd = date.getFullYear().toString() + 
                        (date.getMonth() + 1).toString().padStart(2, '0') + '01';
       const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${yyyymmdd}&stockNo=${stockCode}`;
-      requests.push(fetch(url).then(res => res.json()));
+
+      const request = fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          updateProgressBar((i + 1) / 12 * 100); // 🔥 更新進度條
+          return data;
+        });
+
+      requests.push(request);
     }
 
     try {
       const results = await Promise.all(requests);
 
-      // 🔥 🔥 🔥 新增這段檢查
-      const hasData = results.some(result => result.stat === "OK" && result.data && result.data.length > 0);
-      if (!hasData) {
-        throw new Error("找不到任何股價資料");
-      }
-
       let combinedData = [];
-      results.forEach(monthData => {
+      results.forEach((monthData) => {
         if (monthData.stat === "OK") {
-          monthData.data.forEach(row => {
+          monthData.data.forEach((row, index) => {
             const date = row[0];
             const open = parseFloat(row[3].replace(',', ''));
             const high = parseFloat(row[4].replace(',', ''));
             const low = parseFloat(row[5].replace(',', ''));
             const close = parseFloat(row[6].replace(',', ''));
+
             if (!isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
-              combinedData.push({
+              const record = {
                 Date: formatDate(date),
                 Open: open,
                 High: high,
                 Low: low,
                 Close: close
-              });
+              };
+
+              fixInvalidData(record, combinedData.length); // 🔥 資料檢查修正
+              combinedData.push(record);
             }
           });
         }
       });
 
       stockData = combinedData.sort((a, b) => new Date(a.Date) - new Date(b.Date));
-      currentIndex = 20;
+      currentIndex = getRandomStartIndex();
 
       drawChart();
       showInitialCapitalDialog();
       selectAction('hold');
 
       alert(`股票 ${stockName} ${stockCode} 資料載入成功！可以開始模擬交易囉！`);
+      updateProgressBar(100); // 🔥 下載結束補滿進度
     } catch (error) {
       alert("⚠️ 找不到股價資料，請改用手動下載模式！");
       const proceed = confirm(
@@ -890,4 +1026,106 @@ async function downloadStock() {
 function formatDate(twDateStr) {
   const [y, m, d] = twDateStr.split('/');
   return `${parseInt(y, 10) + 1911}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+// 🔥 修正異常的價格
+function fixInvalidData(row, index) {
+  const fields = ['Open', 'High', 'Low', 'Close'];
+  fields.forEach(field => {
+    let value = parseFloat(row[field]);
+    if (isNaN(value) || value < 0 || value > 100000) {
+      const fallback = getFallbackPrice(index);
+      const randomFactor = 1 + (Math.random() * 0.02 - 0.01);  // ±1% 隨機
+      row[field] = (fallback * randomFactor).toFixed(2);
+    }
+  });
+}
+
+function getFallbackPrice(index) {
+  if (index > 0) {
+    const prevClose = parseFloat(stockData[index - 1]?.Close);
+    if (!isNaN(prevClose) && prevClose > 0) {
+      return prevClose;
+    }
+  }
+  return 100; // 沒有前一天就用100
+}
+
+
+
+function exportCurrentKLine() {
+  if (stockData.length === 0) {
+    alert("目前沒有任何股價資料！");
+    return;
+  }
+
+  const firstIndex = Math.max(0, currentIndex - 20);
+  const lastIndex = Math.min(stockData.length - 1, currentIndex);
+
+  const dataToExport = stockData.slice(firstIndex, lastIndex + 1);
+
+  // 轉成CSV格式
+  let csvContent = "Date,Open,High,Low,Close\n";
+  dataToExport.forEach(row => {
+    csvContent += `${row.Date},${row.Open},${row.High},${row.Low},${row.Close}\n`;
+  });
+
+  // 建立Blob並下載
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", "current_kline_data.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+// === 資料異常修正工具 ===
+
+// 🔥 主函數：檢查並修正每一筆資料
+function fixInvalidData(row, index) {
+  const fields = ['Open', 'High', 'Low', 'Close'];
+
+  fields.forEach(field => {
+    let value = parseFloat(row[field]);
+
+    // 如果不是數字或大於10萬，使用安全的替代價格
+    if (isNaN(value) || value > 100000) {
+      const fallback = getFallbackPrice(index);
+      const randomFactor = 1 + (Math.random() * 0.02 - 0.01);  // ±1%
+      row[field] = (fallback * randomFactor).toFixed(2);
+    }
+    // 如果是負數，用當天開盤價來取代
+    else if (value < 0) {
+      const openValue = parseFloat(row['Open']);
+      if (!isNaN(openValue)) {
+        row[field] = openValue.toFixed(2);
+      } else {
+        // 如果開盤價也壞掉，還是用安全價格
+        const fallback = getFallbackPrice(index);
+        row[field] = fallback.toFixed(2);
+      }
+    }
+    // 正常情況：四捨五入保留2位小數
+    else {
+      row[field] = value.toFixed(2);
+    }
+  });
+}
+
+// 🔥 取得替代價格（通常是前一天的收盤價）
+function getFallbackPrice(index) {
+  if (index > 0 && stockData[index - 1]) {
+    const prevClose = parseFloat(stockData[index - 1].Close);
+    if (!isNaN(prevClose) && prevClose > 0) {
+      return prevClose;
+    }
+  }
+  // 如果沒有前一天，就用安全的100
+  return 100;
+}
+function updateProgressBar(percent) {
+  const bar = document.getElementById('progress-bar');
+  if (bar) {
+    bar.style.width = `${percent}%`;
+  }
 }
